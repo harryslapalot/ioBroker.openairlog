@@ -1,0 +1,29 @@
+{
+  "type": "tabs",
+  "items": {
+    "connection": {
+      "type": "panel",
+      "label": "Connection",
+      "items": {
+        "apiKey": {
+          "type": "password",
+          "label": "OpenAirLog API key",
+          "help": "A read-only API key with the flights:read permission."
+        },
+        "interval": {
+          "type": "number",
+          "label": "Polling interval (minutes)",
+          "min": 5,
+          "max": 1440,
+          "default": 15,
+          "unit": "min"
+        },
+        "evenIsOutbound": {
+          "type": "checkbox",
+          "label": "Even flight number means outbound",
+          "default": true
+        }
+      }
+    }
+  }
+}

@@ -11,14 +11,22 @@
   "author": "Stefan Gmelin",
   "license": "MIT",
   "main": "main.js",
+  "homepage": "https://github.com/harryslapalot/ioBroker.openairlog",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harryslapalot/ioBroker.openairlog.git"
+  },
+  "bugs": {
+    "url": "https://github.com/harryslapalot/ioBroker.openairlog/issues"
+  },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "@iobroker/adapter-core": ">=3.0.0"
+    "@iobroker/adapter-core": "^3.2.2"
   },
   "devDependencies": {
-    "@iobroker/testing": "^5.2.2",
+    "@iobroker/testing": "^4.1.3",
     "@iobroker/repochecker": "^5.20.1"
   },
   "scripts": {

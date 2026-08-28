@@ -1,0 +1,42 @@
+{
+  "common": {
+    "name": "openairlog",
+    "version": "0.3.0",
+    "news": {
+      "0.3.0": {
+        "en": "Reworked flight and rotation handling, JSON configuration and GitHub CI.",
+        "de": "Flug- und Rotationslogik überarbeitet, JSON-Konfiguration und GitHub-CI ergänzt."
+      }
+    },
+    "titleLang": {
+      "en": "OpenAirLog",
+      "de": "OpenAirLog"
+    },
+    "desc": {
+      "en": "Read flight and rotation data from OpenAirLog.",
+      "de": "Liest Flug- und Rotationsdaten aus OpenAirLog."
+    },
+    "authors": [
+      "Stefan Gmelin <harryslapalot>"
+    ],
+    "keywords": [
+      "flight",
+      "aviation",
+      "OpenAirLog"
+    ],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "type": "general",
+    "compact": true,
+    "tier": 3,
+    "adminUI": {
+      "config": "json"
+    }
+  },
+  "native": {
+    "apiKey": "",
+    "interval": 15,
+    "evenIsOutbound": true
+  }
+}

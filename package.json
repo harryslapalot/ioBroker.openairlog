@@ -1,4 +1,4 @@
-
+{
   "name": "iobroker.openairlog",
   "version": "0.3.0",
   "description": "Read flight and rotation data from OpenAirLog",

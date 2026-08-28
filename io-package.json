@@ -2,19 +2,46 @@
   "common": {
     "name": "openairlog",
     "version": "0.3.0",
-    "news": {
-      "0.3.0": {
-        "en": "Initial development release with flight and rotation detection.",
-        "de": "Erste Entwicklungsversion mit Flug- und Rotationserkennung."
-      }
-    },
     "titleLang": {
       "en": "OpenAirLog",
-      "de": "OpenAirLog"
+      "de": "OpenAirLog",
+      "ru": "OpenAirLog",
+      "pt": "OpenAirLog",
+      "nl": "OpenAirLog",
+      "fr": "OpenAirLog",
+      "it": "OpenAirLog",
+      "es": "OpenAirLog",
+      "pl": "OpenAirLog",
+      "uk": "OpenAirLog",
+      "zh-cn": "OpenAirLog"
     },
     "desc": {
       "en": "Read flight and rotation data from OpenAirLog.",
-      "de": "Liest Flug- und Rotationsdaten aus OpenAirLog."
+      "de": "Liest Flug- und Rotationsdaten aus OpenAirLog.",
+      "ru": "Получает данные о полётах и ротациях из OpenAirLog.",
+      "pt": "Lê dados de voos e rotações do OpenAirLog.",
+      "nl": "Leest vlucht- en rotatiegegevens van OpenAirLog.",
+      "fr": "Lit les données de vols et de rotations depuis OpenAirLog.",
+      "it": "Legge i dati dei voli e delle rotazioni da OpenAirLog.",
+      "es": "Lee datos de vuelos y rotaciones de OpenAirLog.",
+      "pl": "Odczytuje dane lotów i rotacji z OpenAirLog.",
+      "uk": "Зчитує дані про рейси та ротації з OpenAirLog.",
+      "zh-cn": "从 OpenAirLog 读取航班和航段轮换数据。"
+    },
+    "news": {
+      "0.3.0": {
+        "en": "Initial development release with flight and rotation detection.",
+        "de": "Erste Entwicklungsversion mit Flug- und Rotationserkennung.",
+        "ru": "Первая версия для разработки с определением рейсов и ротаций.",
+        "pt": "Primeira versão de desenvolvimento com deteção de voos e rotações.",
+        "nl": "Eerste ontwikkelversie met vlucht- en rotatiedetectie.",
+        "fr": "Première version de développement avec détection des vols et rotations.",
+        "it": "Prima versione di sviluppo con rilevamento di voli e rotazioni.",
+        "es": "Primera versión de desarrollo con detección de vuelos y rotaciones.",
+        "pl": "Pierwsza wersja rozwojowa z wykrywaniem lotów i rotacji.",
+        "uk": "Перша версія для розробки з визначенням рейсів і ротацій.",
+        "zh-cn": "首个开发版本，支持航班和航段轮换检测。"
+      }
     },
     "authors": [
       "Stefan Gmelin <harryslapalot>"
@@ -24,7 +51,6 @@
       "aviation",
       "OpenAirLog"
     ],
-    "license": "MIT",
     "platform": "Javascript/Node.js",
     "mode": "daemon",
     "type": "general",
@@ -35,12 +61,25 @@
     "adminUI": {
       "config": "json"
     },
+    "icon": "openairlog.svg",
+    "extIcon": "https://raw.githubusercontent.com/harryslapalot/ioBroker.openairlog/main/admin/openairlog.svg",
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free",
+      "link": "https://opensource.org/licenses/MIT"
+    },
     "dependencies": [
       {
         "js-controller": ">=6.0.11"
       }
     ]
   },
+  "protectedNative": [
+    "apiKey"
+  ],
+  "encryptedNative": [
+    "apiKey"
+  ],
   "native": {
     "apiKey": "",
     "interval": 15,

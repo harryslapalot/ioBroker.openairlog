@@ -1,0 +1,27 @@
+
+  "name": "iobroker.openairlog",
+  "version": "0.3.0",
+  "description": "Read flight and rotation data from OpenAirLog",
+  "keywords": [
+    "ioBroker",
+    "OpenAirLog",
+    "flights",
+    "aviation"
+  ],
+  "author": "Stefan Gmelin",
+  "license": "MIT",
+  "main": "main.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@iobroker/adapter-core": ">=3.0.0"
+  },
+  "devDependencies": {
+    "@iobroker/repochecker": "^5.20.1"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "npx @iobroker/repochecker . --local"
+  }
+}

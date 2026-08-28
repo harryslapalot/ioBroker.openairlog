@@ -4,8 +4,8 @@
     "version": "0.3.0",
     "news": {
       "0.3.0": {
-        "en": "Reworked flight and rotation handling, JSON configuration and GitHub CI.",
-        "de": "Flug- und Rotationslogik überarbeitet, JSON-Konfiguration und GitHub-CI ergänzt."
+        "en": "Initial development release with flight and rotation detection.",
+        "de": "Erste Entwicklungsversion mit Flug- und Rotationserkennung."
       }
     },
     "titleLang": {
@@ -30,9 +30,16 @@
     "type": "general",
     "compact": true,
     "tier": 3,
+    "connectionType": "cloud",
+    "dataSource": "poll",
     "adminUI": {
       "config": "json"
-    }
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=6.0.11"
+      }
+    ]
   },
   "native": {
     "apiKey": "",

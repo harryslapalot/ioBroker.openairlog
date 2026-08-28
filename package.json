@@ -18,6 +18,7 @@
     "@iobroker/adapter-core": ">=3.0.0"
   },
   "devDependencies": {
+    "@iobroker/testing": "^5.2.2",
     "@iobroker/repochecker": "^5.20.1"
   },
   "scripts": {

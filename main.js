@@ -502,11 +502,11 @@ class OpenAirLog extends utils.Adapter {
             );
 
             /*
-             * findNextFlight() first searches today's
-             * remaining flights.
+             * The next flight is always the next
+             * not-yet-started flight.
              *
-             * Only if there are no remaining flights
-             * today does it select a future date.
+             * Remaining flights today have priority
+             * over flights on later dates.
              */
             const next =
                 findNextFlight(
@@ -546,11 +546,18 @@ class OpenAirLog extends utils.Adapter {
     async cleanupOldFlightObjects(
         flightCount
     ) {
+        /*
+         * getForeignObjectsAsync() returns an object map,
+         * not an array. Therefore Object.keys() is used.
+         */
         const objects =
-            await this.getAdapterObjectsAsync();
+            await this.getForeignObjectsAsync(
+                `${this.namespace}.today.flights.*`
+            );
 
-        const prefix =
-            `${this.namespace}.today.flights.`;
+        if (!objects) {
+            return;
+        }
 
         const validIndexes =
             new Set(
@@ -563,29 +570,37 @@ class OpenAirLog extends utils.Adapter {
                 )
             );
 
-        for (const object of objects) {
+        const prefix =
+            `${this.namespace}.today.flights.`;
 
+        for (
+            const objectId of
+                Object.keys(objects)
+        ) {
             if (
-                !object._id.startsWith(prefix)
+                !objectId.startsWith(prefix)
             ) {
                 continue;
             }
 
             const relative =
-                object._id.slice(
+                objectId.slice(
                     prefix.length
                 );
 
             /*
-             * We only care about flight channels
-             * such as:
+             * Only match the actual flight channel:
              *
              * today.flights.0
              * today.flights.1
+             *
+             * NOT:
+             *
+             * today.flights.0.flightNumber
              */
             const match =
                 relative.match(
-                    /^(\d+)(?:\.|$)/
+                    /^(\d+)$/
                 );
 
             if (!match) {
@@ -596,18 +611,17 @@ class OpenAirLog extends utils.Adapter {
                 match[1];
 
             if (
-                !validIndexes.has(index)
+                validIndexes.has(index)
             ) {
-                await this.delObjectAsync(
-                    object._id.replace(
-                        `${this.namespace}.`,
-                        ''
-                    ),
-                    {
-                        recursive: true
-                    }
-                );
+                continue;
             }
+
+            await this.delForeignObjectAsync(
+                `${this.namespace}.today.flights.${index}`,
+                {
+                    recursive: true
+                }
+            );
         }
     }
 
@@ -721,10 +735,10 @@ class OpenAirLog extends utils.Adapter {
         }
 
         /*
-         * Determine current location from the latest
-         * sector which has already departed.
+         * Determine the current location from
+         * the latest sector which has already departed.
          *
-         * Both date and scheduled_off_block are UTC.
+         * OpenAirLog date and scheduled times are UTC.
          */
         let currentLocation =
             first?.departure || '';
@@ -768,7 +782,7 @@ class OpenAirLog extends utils.Adapter {
         );
 
         /*
-         * Remove old flight channels before
+         * Remove obsolete flight channels before
          * publishing today's actual flights.
          */
         await this.cleanupOldFlightObjects(
@@ -879,7 +893,6 @@ class OpenAirLog extends utils.Adapter {
     }
 
     async publishNext(flight) {
-
         const values = {
 
             flightNumber:

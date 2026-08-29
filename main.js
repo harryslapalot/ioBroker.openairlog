@@ -293,11 +293,6 @@ class OpenAirLog extends utils.Adapter {
             }
         );
 
-        /*
-         * The next object contains the same relevant
-         * information as the individual flights under
-         * today.flights.
-         */
         for (
             const id of [
                 'flightNumber',
@@ -507,10 +502,11 @@ class OpenAirLog extends utils.Adapter {
             );
 
             /*
-             * findNextFlight first searches today's
-             * remaining flights. Only if there are no
-             * more flights today does it look at future
-             * dates.
+             * findNextFlight() first searches today's
+             * remaining flights.
+             *
+             * Only if there are no remaining flights
+             * today does it select a future date.
              */
             const next =
                 findNextFlight(
@@ -544,6 +540,74 @@ class OpenAirLog extends utils.Adapter {
             );
 
             throw error;
+        }
+    }
+
+    async cleanupOldFlightObjects(
+        flightCount
+    ) {
+        const objects =
+            await this.getAdapterObjectsAsync();
+
+        const prefix =
+            `${this.namespace}.today.flights.`;
+
+        const validIndexes =
+            new Set(
+                Array.from(
+                    {
+                        length: flightCount
+                    },
+                    (_, index) =>
+                        String(index)
+                )
+            );
+
+        for (const object of objects) {
+
+            if (
+                !object._id.startsWith(prefix)
+            ) {
+                continue;
+            }
+
+            const relative =
+                object._id.slice(
+                    prefix.length
+                );
+
+            /*
+             * We only care about flight channels
+             * such as:
+             *
+             * today.flights.0
+             * today.flights.1
+             */
+            const match =
+                relative.match(
+                    /^(\d+)(?:\.|$)/
+                );
+
+            if (!match) {
+                continue;
+            }
+
+            const index =
+                match[1];
+
+            if (
+                !validIndexes.has(index)
+            ) {
+                await this.delObjectAsync(
+                    object._id.replace(
+                        `${this.namespace}.`,
+                        ''
+                    ),
+                    {
+                        recursive: true
+                    }
+                );
+            }
         }
     }
 
@@ -660,7 +724,7 @@ class OpenAirLog extends utils.Adapter {
          * Determine current location from the latest
          * sector which has already departed.
          *
-         * OpenAirLog date and scheduled times are UTC.
+         * Both date and scheduled_off_block are UTC.
          */
         let currentLocation =
             first?.departure || '';
@@ -701,6 +765,14 @@ class OpenAirLog extends utils.Adapter {
             'today.isCurrentlyAway',
             Boolean(currentLocation) &&
             currentLocation !== this.homebase
+        );
+
+        /*
+         * Remove old flight channels before
+         * publishing today's actual flights.
+         */
+        await this.cleanupOldFlightObjects(
+            summary.flights.length
         );
 
         /*

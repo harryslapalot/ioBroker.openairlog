@@ -28,14 +28,23 @@ class OpenAirLog extends utils.Adapter {
     async onReady() {
         await this.createObjects();
 
-        await this.setStateAsync('info.connection', false, true);
+        await this.setStateAsync(
+            'info.connection',
+            false,
+            true
+        );
 
         if (!this.config.apiKey) {
-            this.log.error('No OpenAirLog API key configured.');
+            this.log.error(
+                'No OpenAirLog API key configured.'
+            );
             return;
         }
 
-        this.homebase = normalizeHomebase(this.config.homebase);
+        this.homebase =
+            normalizeHomebase(
+                this.config.homebase
+            );
 
         this.pollInterval =
             Math.max(
@@ -72,13 +81,16 @@ class OpenAirLog extends utils.Adapter {
     }
 
     async createObjects() {
-        await this.extendObjectAsync('info', {
-            type: 'channel',
-            common: {
-                name: 'Information'
-            },
-            native: {}
-        });
+        await this.extendObjectAsync(
+            'info',
+            {
+                type: 'channel',
+                common: {
+                    name: 'Information'
+                },
+                native: {}
+            }
+        );
 
         await this.createState(
             'info.connection',
@@ -102,13 +114,16 @@ class OpenAirLog extends utils.Adapter {
             }
         );
 
-        await this.extendObjectAsync('today', {
-            type: 'channel',
-            common: {
-                name: 'Today'
-            },
-            native: {}
-        });
+        await this.extendObjectAsync(
+            'today',
+            {
+                type: 'channel',
+                common: {
+                    name: 'Today'
+                },
+                native: {}
+            }
+        );
 
         const states = {
             hasFlight: [
@@ -278,6 +293,11 @@ class OpenAirLog extends utils.Adapter {
             }
         );
 
+        /*
+         * The next object contains the same relevant
+         * information as the individual flights under
+         * today.flights.
+         */
         for (
             const id of [
                 'flightNumber',
@@ -285,15 +305,29 @@ class OpenAirLog extends utils.Adapter {
                 'departure',
                 'arrival',
                 'scheduledOffBlock',
-                'scheduledOnBlock'
+                'scheduledOnBlock',
+                'aircraftType',
+                'aircraftRegistration',
+                'crewPosition',
+                'blockMinutes',
+                'direction'
             ]
         ) {
             await this.createState(
                 `next.${id}`,
                 {
                     name: id,
-                    type: 'string',
-                    role: 'text',
+
+                    type:
+                        id === 'blockMinutes'
+                            ? 'number'
+                            : 'string',
+
+                    role:
+                        id === 'blockMinutes'
+                            ? 'value'
+                            : 'text',
+
                     read: true,
                     write: false
                 }
@@ -472,6 +506,12 @@ class OpenAirLog extends utils.Adapter {
                 currentSeconds
             );
 
+            /*
+             * findNextFlight first searches today's
+             * remaining flights. Only if there are no
+             * more flights today does it look at future
+             * dates.
+             */
             const next =
                 findNextFlight(
                     flights,
@@ -617,13 +657,11 @@ class OpenAirLog extends utils.Adapter {
         }
 
         /*
-         * Determine current location from the
-         * latest sector which has already departed.
+         * Determine current location from the latest
+         * sector which has already departed.
          *
-         * OpenAirLog date and scheduled times are
-         * interpreted as UTC.
+         * OpenAirLog date and scheduled times are UTC.
          */
-
         let currentLocation =
             first?.departure || '';
 
@@ -668,7 +706,6 @@ class OpenAirLog extends utils.Adapter {
         /*
          * Publish today's individual flights.
          */
-
         for (
             let i = 0;
             i < summary.flights.length;
@@ -789,7 +826,27 @@ class OpenAirLog extends utils.Adapter {
                 flight?.scheduled_off_block || '',
 
             scheduledOnBlock:
-                flight?.scheduled_on_block || ''
+                flight?.scheduled_on_block || '',
+
+            aircraftType:
+                flight?.aircraft_type || '',
+
+            aircraftRegistration:
+                flight?.aircraft_registration || '',
+
+            crewPosition:
+                flight?.crew_position || '',
+
+            blockMinutes:
+                flight?.block_minutes ?? null,
+
+            direction:
+                flight
+                    ? routeDirection(
+                        flight,
+                        this.homebase
+                    )
+                    : ''
         };
 
         for (

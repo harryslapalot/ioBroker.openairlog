@@ -11,7 +11,8 @@ const {
     getArrivalTime,
     findNextFlight,
     getHomebaseAction,
-    summarizeDay
+    summarizeDay,
+    getCurrentLocation
 } = require('./lib/flightLogic');
 
 class OpenAirLog extends utils.Adapter {
@@ -423,13 +424,20 @@ class OpenAirLog extends utils.Adapter {
         const fromDate =
             new Date(now);
 
+        /*
+         * Keep seven days of history available
+         * for currentLocation.
+         */
         fromDate.setUTCDate(
-            fromDate.getUTCDate() - 1
+            fromDate.getUTCDate() - 7
         );
 
         const toDate =
             new Date(now);
 
+        /*
+         * Keep two future days for next.
+         */
         toDate.setUTCDate(
             toDate.getUTCDate() + 2
         );
@@ -497,10 +505,16 @@ class OpenAirLog extends utils.Adapter {
                     currentSeconds
                 );
 
+            /*
+             * Pass the complete loaded flight history
+             * so currentLocation can use flights from
+             * previous UTC dates as well.
+             */
             await this.publishToday(
                 summary,
                 homebaseAction,
-                currentSeconds
+                currentSeconds,
+                flights
             );
 
             /*
@@ -627,7 +641,8 @@ class OpenAirLog extends utils.Adapter {
     async publishToday(
         summary,
         homebaseAction,
-        currentSeconds
+        currentSeconds,
+        allFlights
     ) {
         const set =
             (id, value) =>
@@ -759,42 +774,21 @@ class OpenAirLog extends utils.Adapter {
         }
 
         /*
-         * Determine current location from the latest
-         * sector which has already departed.
+         * Determine current location from the complete
+         * flight history, not only today's flights.
          *
-         * Date and times are interpreted as UTC.
+         * This allows the adapter to know that the user
+         * is still in Mexico even when today's flight list
+         * is empty and the next flight starts in Mexico.
          */
-        let currentLocation =
-            first?.departure || '';
+        const currentPosition =
+            getCurrentLocation(
+                allFlights,
+                new Date()
+            );
 
-        for (
-            const flight of
-                sortFlights(
-                    summary.flights
-                )
-        ) {
-            const departureSeconds =
-                parseTimeToSeconds(
-                    getDepartureTime(
-                        flight
-                    )
-                );
-
-            if (
-                departureSeconds === null
-            ) {
-                continue;
-            }
-
-            if (
-                departureSeconds <=
-                currentSeconds
-            ) {
-                currentLocation =
-                    flight.arrival ||
-                    currentLocation;
-            }
-        }
+        const currentLocation =
+            currentPosition.location || '';
 
         await set(
             'today.currentLocation',

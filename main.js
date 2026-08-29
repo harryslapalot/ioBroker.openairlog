@@ -1,6 +1,7 @@
 'use strict';
 
 const utils = require('@iobroker/adapter-core');
+
 const {
     summarizeDay,
     directionForFlight,
@@ -22,28 +23,34 @@ class OpenAirLog extends utils.Adapter {
     }
 
     async onReady() {
-    await this.createObjects();
+        await this.createObjects();
 
-    await this.setStateAsync(
-        'info.connection',
-        false,
-        true
-    );
+        await this.setStateAsync(
+            'info.connection',
+            false,
+            true
+        );
 
-    if (!this.config.apiKey) {
-            this.log.error('No OpenAirLog API key configured.');
+        if (!this.config.apiKey) {
+            this.log.error(
+                'No OpenAirLog API key configured.'
+            );
             return;
         }
 
         this.pollInterval =
-            Math.max(5, Number(this.config.interval) || 15) * 60 * 1000;
+            Math.max(
+                5,
+                Number(this.config.interval) || 15
+            ) * 60 * 1000;
 
-        await this.createObjects();
         await this.updateData();
 
         this.pollTimer = setInterval(() => {
             this.updateData().catch(error => {
-                this.log.error(`OpenAirLog: ${error.message}`);
+                this.log.error(
+                    `OpenAirLog: ${error.message}`
+                );
             });
         }, this.pollInterval);
     }
@@ -57,7 +64,6 @@ class OpenAirLog extends utils.Adapter {
     }
 
     async createObjects() {
-        // Information
         await this.extendObjectAsync('info', {
             type: 'channel',
             common: {
@@ -82,7 +88,6 @@ class OpenAirLog extends utils.Adapter {
             write: false
         });
 
-        // Today
         await this.extendObjectAsync('today', {
             type: 'channel',
             common: {
@@ -92,31 +97,72 @@ class OpenAirLog extends utils.Adapter {
         });
 
         const states = {
-            hasFlight: ['Has flight', 'boolean', 'indicator'],
-            flightCount: ['Flight count', 'number', 'value'],
+            hasFlight: [
+                'Has flight',
+                'boolean',
+                'indicator'
+            ],
 
-            firstFlightNumber: ['First flight number', 'string', 'text'],
-            firstDeparture: ['First departure', 'string', 'text'],
-            firstArrival: ['First arrival', 'string', 'text'],
+            flightCount: [
+                'Flight count',
+                'number',
+                'value'
+            ],
+
+            firstFlightNumber: [
+                'First flight number',
+                'string',
+                'text'
+            ],
+
+            firstDeparture: [
+                'First departure',
+                'string',
+                'text'
+            ],
+
+            firstArrival: [
+                'First arrival',
+                'string',
+                'text'
+            ],
+
             firstScheduledOffBlock: [
                 'First scheduled off-block',
                 'string',
                 'text'
             ],
+
             firstScheduledOnBlock: [
                 'First scheduled on-block',
                 'string',
                 'text'
             ],
 
-            lastFlightNumber: ['Last flight number', 'string', 'text'],
-            lastDeparture: ['Last departure', 'string', 'text'],
-            lastArrival: ['Last arrival', 'string', 'text'],
+            lastFlightNumber: [
+                'Last flight number',
+                'string',
+                'text'
+            ],
+
+            lastDeparture: [
+                'Last departure',
+                'string',
+                'text'
+            ],
+
+            lastArrival: [
+                'Last arrival',
+                'string',
+                'text'
+            ],
+
             lastScheduledOffBlock: [
                 'Last scheduled off-block',
                 'string',
                 'text'
             ],
+
             lastScheduledOnBlock: [
                 'Last scheduled on-block',
                 'string',
@@ -184,7 +230,6 @@ class OpenAirLog extends utils.Adapter {
             native: {}
         });
 
-        // Next flight
         await this.extendObjectAsync('next', {
             type: 'channel',
             common: {
@@ -223,15 +268,29 @@ class OpenAirLog extends utils.Adapter {
                 `https://openairlog.de/api/v1${path}`,
                 {
                     headers: {
-                        Authorization: `Bearer ${this.config.apiKey}`,
+                        Authorization:
+                            `Bearer ${this.config.apiKey}`,
                         Accept: 'application/json'
                     },
                     signal: controller.signal
                 }
             );
 
+            if (response.status === 401) {
+                throw new Error(
+                    'OpenAirLog API key is invalid or disabled.'
+                );
+            }
+
+            if (response.status === 403) {
+                throw new Error(
+                    'OpenAirLog API permission denied.'
+                );
+            }
+
             if (response.status === 429) {
-                const retryAfter = response.headers.get('retry-after');
+                const retryAfter =
+                    response.headers.get('retry-after');
 
                 throw new Error(
                     `OpenAirLog rate limit exceeded${
@@ -248,60 +307,173 @@ class OpenAirLog extends utils.Adapter {
                 );
             }
 
-            return response.json();
+            return await response.json();
         } finally {
             clearTimeout(timeout);
         }
     }
 
+    /*
+     * OpenAirLog flight dates are interpreted using
+     * Frankfurt / Europe-Berlin as the reference date.
+     *
+     * This prevents UTC conversion from moving a flight
+     * to the wrong calendar day.
+     */
+    getFrankfurtDate() {
+        return new Intl.DateTimeFormat(
+            'en-CA',
+            {
+                timeZone: 'Europe/Berlin',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }
+        ).format(new Date());
+    }
+
     getDateRange() {
-        const now = new Date();
+        const today = this.getFrankfurtDate();
 
-        const start = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() - 1
+        const date = new Date(
+            `${today}T12:00:00+01:00`
         );
 
-        const end = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + 2
-        );
+        date.setDate(date.getDate() - 1);
 
-        const iso = date => date.toISOString().slice(0, 10);
+        const from =
+            date.toISOString().slice(0, 10);
+
+        date.setDate(date.getDate() + 3);
+
+        const to =
+            date.toISOString().slice(0, 10);
 
         return {
-            from: iso(start),
-            to: iso(end),
-            today: iso(now)
+            from,
+            to,
+            today
         };
+    }
+
+    isFlightInTheFuture(flight, today) {
+        if (!flight?.date) {
+            return false;
+        }
+
+        /*
+         * Any flight on a later calendar day is future.
+         */
+        if (flight.date > today) {
+            return true;
+        }
+
+        /*
+         * Flights from previous days are not future.
+         */
+        if (flight.date < today) {
+            return false;
+        }
+
+        /*
+         * For today's flights compare the scheduled
+         * off-block time with the current Frankfurt time.
+         */
+        if (!flight.scheduled_off_block) {
+            return false;
+        }
+
+        const nowParts =
+            new Intl.DateTimeFormat(
+                'en-GB',
+                {
+                    timeZone: 'Europe/Berlin',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }
+            ).formatToParts(new Date());
+
+        const parts = {};
+
+        for (const part of nowParts) {
+            parts[part.type] = part.value;
+        }
+
+        const currentSeconds =
+            Number(parts.hour) * 3600 +
+            Number(parts.minute) * 60 +
+            Number(parts.second);
+
+        const match =
+            String(
+                flight.scheduled_off_block
+            ).match(
+                /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+            );
+
+        if (!match) {
+            return false;
+        }
+
+        const flightSeconds =
+            Number(match[1]) * 3600 +
+            Number(match[2]) * 60 +
+            Number(match[3] || 0);
+
+        return flightSeconds > currentSeconds;
     }
 
     async updateData() {
         try {
-            const { from, to, today } = this.getDateRange();
+            const {
+                from,
+                to,
+                today
+            } = this.getDateRange();
+
+            this.log.debug(
+                `Loading flights from ${from} to ${to}; today=${today}`
+            );
 
             const response = await this.request(
                 `/flights?from=${from}&to=${to}&per_page=200`
             );
 
-            const flights = Array.isArray(response?.data)
-                ? response.data
-                : [];
+            const flights =
+                Array.isArray(response?.data)
+                    ? response.data
+                    : [];
 
-            const todayFlights = flights.filter(
-                flight => flight.date === today
+            /*
+             * IMPORTANT:
+             *
+             * The date comparison is performed against the
+             * Frankfurt calendar date, not against UTC.
+             */
+            const todayFlights =
+                flights.filter(
+                    flight =>
+                        flight.date === today
+                );
+
+            this.log.debug(
+                `Found ${todayFlights.length} flight(s) for ${today}`
             );
 
-            const summary = summarizeDay(
-                todayFlights,
-                this.config.evenIsOutbound !== false
-            );
+            const summary =
+                summarizeDay(
+                    todayFlights,
+                    this.config.evenIsOutbound !== false
+                );
 
             await this.publishToday(summary);
 
-            await this.publishNext(flights);
+            await this.publishNext(
+                flights,
+                today
+            );
 
             await this.setStateAsync(
                 'info.connection',
@@ -371,59 +543,73 @@ class OpenAirLog extends utils.Adapter {
         const first = summary.first;
         const last = summary.last;
 
-        const firstLastValues = {
-            firstFlightNumber: first?.flight_number,
-            firstDeparture: first?.departure,
-            firstArrival: first?.arrival,
+        const values = {
+            firstFlightNumber:
+                first?.flight_number,
+
+            firstDeparture:
+                first?.departure,
+
+            firstArrival:
+                first?.arrival,
+
             firstScheduledOffBlock:
                 first?.scheduled_off_block,
+
             firstScheduledOnBlock:
                 first?.scheduled_on_block,
 
-            lastFlightNumber: last?.flight_number,
-            lastDeparture: last?.departure,
-            lastArrival: last?.arrival,
+            lastFlightNumber:
+                last?.flight_number,
+
+            lastDeparture:
+                last?.departure,
+
+            lastArrival:
+                last?.arrival,
+
             lastScheduledOffBlock:
                 last?.scheduled_off_block,
+
             lastScheduledOnBlock:
                 last?.scheduled_on_block
         };
 
-        for (const [id, value] of Object.entries(
-            firstLastValues
-        )) {
-            await set(`today.${id}`, value);
+        for (const [id, value] of Object.entries(values)) {
+            await set(
+                `today.${id}`,
+                value
+            );
         }
 
         /*
-         * Current location
+         * Determine the best current location.
          *
-         * This is deliberately conservative. We only use scheduled
-         * departure times that have already passed.
+         * We use actual timestamps where available and
+         * otherwise scheduled times.
          */
         let currentLocation =
             first?.departure || '';
 
-        const now = new Date();
+        const now = Date.now();
 
         for (const flight of sortFlights(summary.flights)) {
-            if (
-                !flight.date ||
-                !flight.scheduled_off_block
-            ) {
+            const departure =
+                flight.off_block ||
+                flight.scheduled_off_block;
+
+            if (!flight.date || !departure) {
                 continue;
             }
 
-            const scheduledDeparture =
-                new Date(
-                    `${flight.date}T${flight.scheduled_off_block}`
+            const timestamp =
+                Date.parse(
+                    `${flight.date}T${departure}`
                 );
 
             if (
-                !Number.isNaN(
-                    scheduledDeparture.getTime()
-                ) &&
-                scheduledDeparture <= now
+                !Number.isNaN(timestamp) &&
+                timestamp <= now
             ) {
                 currentLocation =
                     flight.arrival ||
@@ -443,14 +629,15 @@ class OpenAirLog extends utils.Adapter {
         );
 
         /*
-         * Individual flights
+         * Individual flights of today
          */
         for (
             let i = 0;
             i < summary.flights.length;
             i++
         ) {
-            const flight = summary.flights[i];
+            const flight =
+                summary.flights[i];
 
             const channelId =
                 `today.flights.${i}`;
@@ -540,51 +727,65 @@ class OpenAirLog extends utils.Adapter {
         }
     }
 
-    async publishNext(flights) {
-        const sorted = sortFlights(flights);
+    async publishNext(flights, today) {
+        const sorted =
+            sortFlights(flights);
 
-        const next = sorted.find(
-            flight =>
-                flight.date &&
-                flight.scheduled_off_block
+        /*
+         * Only flights that have not yet departed
+         * are candidates for "next".
+         */
+        const futureFlights =
+            sorted.filter(
+                flight =>
+                    this.isFlightInTheFuture(
+                        flight,
+                        today
+                    )
+            );
+
+        const next =
+            futureFlights[0] || null;
+
+        this.log.debug(
+            next
+                ? `Next flight: ${next.flight_number} ${next.date} ${next.scheduled_off_block}`
+                : 'No future flight found'
         );
 
-        const set = (id, value) =>
-            this.setStateAsync(
+        const values = {
+            flightNumber:
+                next?.flight_number,
+
+            date:
+                next?.date,
+
+            departure:
+                next?.departure,
+
+            arrival:
+                next?.arrival,
+
+            scheduledOffBlock:
+                next?.scheduled_off_block,
+
+            scheduledOnBlock:
+                next?.scheduled_on_block
+        };
+
+        for (const [id, value] of Object.entries(values)) {
+            await this.setStateAsync(
                 `next.${id}`,
                 value ?? '',
                 true
             );
-
-        for (
-            const [id, value]
-            of Object.entries({
-                flightNumber:
-                    next?.flight_number,
-
-                date:
-                    next?.date,
-
-                departure:
-                    next?.departure,
-
-                arrival:
-                    next?.arrival,
-
-                scheduledOffBlock:
-                    next?.scheduled_off_block,
-
-                scheduledOnBlock:
-                    next?.scheduled_on_block
-            })
-        ) {
-            await set(id, value);
         }
     }
 
     onUnload(callback) {
         if (this.pollTimer) {
             clearInterval(this.pollTimer);
+            this.pollTimer = null;
         }
 
         callback();

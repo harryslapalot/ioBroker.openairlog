@@ -7,6 +7,8 @@ const {
     sortFlights,
     routeDirection,
     parseTimeToSeconds,
+    getDepartureTime,
+    getArrivalTime,
     findNextFlight,
     getHomebaseAction,
     summarizeDay
@@ -502,8 +504,7 @@ class OpenAirLog extends utils.Adapter {
             );
 
             /*
-             * The next flight is always the next
-             * not-yet-started flight.
+             * Find the next not-yet-started flight.
              *
              * Remaining flights today have priority
              * over flights on later dates.
@@ -548,7 +549,7 @@ class OpenAirLog extends utils.Adapter {
     ) {
         /*
          * getForeignObjectsAsync() returns an object map,
-         * not an array. Therefore Object.keys() is used.
+         * not an array.
          */
         const objects =
             await this.getForeignObjectsAsync(
@@ -589,14 +590,12 @@ class OpenAirLog extends utils.Adapter {
                 );
 
             /*
-             * Only match the actual flight channel:
+             * Only match actual flight channels:
              *
              * today.flights.0
              * today.flights.1
              *
-             * NOT:
-             *
-             * today.flights.0.flightNumber
+             * Child states are ignored here.
              */
             const match =
                 relative.match(
@@ -689,6 +688,31 @@ class OpenAirLog extends utils.Adapter {
         const last =
             summary.last;
 
+        /*
+         * Use scheduled times when available.
+         * For already recorded flights OpenAirLog may
+         * only provide off_block / on_block.
+         */
+        const firstOffBlock =
+            first
+                ? getDepartureTime(first)
+                : null;
+
+        const firstOnBlock =
+            first
+                ? getArrivalTime(first)
+                : null;
+
+        const lastOffBlock =
+            last
+                ? getDepartureTime(last)
+                : null;
+
+        const lastOnBlock =
+            last
+                ? getArrivalTime(last)
+                : null;
+
         const values = {
 
             firstFlightNumber:
@@ -701,10 +725,10 @@ class OpenAirLog extends utils.Adapter {
                 first?.arrival,
 
             firstScheduledOffBlock:
-                first?.scheduled_off_block,
+                firstOffBlock,
 
             firstScheduledOnBlock:
-                first?.scheduled_on_block,
+                firstOnBlock,
 
             lastFlightNumber:
                 last?.flight_number,
@@ -716,10 +740,10 @@ class OpenAirLog extends utils.Adapter {
                 last?.arrival,
 
             lastScheduledOffBlock:
-                last?.scheduled_off_block,
+                lastOffBlock,
 
             lastScheduledOnBlock:
-                last?.scheduled_on_block
+                lastOnBlock
         };
 
         for (
@@ -735,10 +759,10 @@ class OpenAirLog extends utils.Adapter {
         }
 
         /*
-         * Determine the current location from
-         * the latest sector which has already departed.
+         * Determine current location from the latest
+         * sector which has already departed.
          *
-         * OpenAirLog date and scheduled times are UTC.
+         * Date and times are interpreted as UTC.
          */
         let currentLocation =
             first?.departure || '';
@@ -751,7 +775,9 @@ class OpenAirLog extends utils.Adapter {
         ) {
             const departureSeconds =
                 parseTimeToSeconds(
-                    flight.scheduled_off_block
+                    getDepartureTime(
+                        flight
+                    )
                 );
 
             if (
@@ -782,8 +808,7 @@ class OpenAirLog extends utils.Adapter {
         );
 
         /*
-         * Remove obsolete flight channels before
-         * publishing today's actual flights.
+         * Remove obsolete flight channels.
          */
         await this.cleanupOldFlightObjects(
             summary.flights.length
@@ -819,6 +844,13 @@ class OpenAirLog extends utils.Adapter {
                 }
             );
 
+            /*
+             * Keep the existing state names.
+             *
+             * scheduledOffBlock and scheduledOnBlock
+             * contain the scheduled value when available
+             * and otherwise the actual block time.
+             */
             const fields = {
 
                 flightNumber:
@@ -834,10 +866,14 @@ class OpenAirLog extends utils.Adapter {
                     flight.arrival,
 
                 scheduledOffBlock:
-                    flight.scheduled_off_block,
+                    getDepartureTime(
+                        flight
+                    ),
 
                 scheduledOnBlock:
-                    flight.scheduled_on_block,
+                    getArrivalTime(
+                        flight
+                    ),
 
                 aircraftType:
                     flight.aircraft_type,
@@ -907,11 +943,19 @@ class OpenAirLog extends utils.Adapter {
             arrival:
                 flight?.arrival || '',
 
+            /*
+             * scheduled values are preferred.
+             * off_block / on_block are used as fallback.
+             */
             scheduledOffBlock:
-                flight?.scheduled_off_block || '',
+                flight
+                    ? getDepartureTime(flight)
+                    : '',
 
             scheduledOnBlock:
-                flight?.scheduled_on_block || '',
+                flight
+                    ? getArrivalTime(flight)
+                    : '',
 
             aircraftType:
                 flight?.aircraft_type || '',

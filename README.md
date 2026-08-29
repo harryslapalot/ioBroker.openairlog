@@ -1,84 +1,31 @@
 # ioBroker.openairlog
 
-ioBroker adapter for reading flight data from OpenAirLog.
+ioBroker adapter for reading flight data from the OpenAirLog REST API.
+
+> **Test version:** This adapter is currently intended for testing. Please report bugs, unexpected behavior, or suggestions through the GitHub repository.
 
 ## Features
 
-- Detects whether there is a flight today.
-- Determines outbound/inbound using configurable flight-number parity.
-- Checks whether the first flight of the day starts in Frankfurt (EDDF).
-- Checks whether the last flight of the day ends in Frankfurt (EDDF).
-- Exposes today's individual flights as channels.
-- Provides the next scheduled flight.
-- Queries a date window around today for rotation context.
-- Uses the read-only OpenAirLog `flights:read` API scope.
+- Reads the user's flights from OpenAirLog.
+- Detects whether there are flights on the current UTC date.
+- Uses the OpenAirLog `date` field as the flight's departure date. The date is not changed when a flight arrives after midnight.
+- Supports a configurable homebase using a four-letter ICAO airport code.
+- Determines outbound/inbound from the actual route rather than flight-number parity.
+- Provides `today.homebaseAction` for use with GPS-based automations.
+- Handles short-haul rotations with multiple visits to the homebase.
+- Provides the next upcoming flight. Remaining flights today always have priority over flights on following days.
+- Provides aircraft type, registration, crew position and block time for today's flights and the next flight.
+- Automatically removes obsolete `today.flights.X` objects when the number of flights changes.
+- Uses only the read-only OpenAirLog `flights:read` API scope.
 
-## Configuration
+## Installation
 
-Enter an OpenAirLog API key with the `flights:read` permission.
+### Manual installation for testing
 
-The default polling interval is 15 minutes and can be configured between 5 and 1440 minutes.
+The adapter can currently be tested directly from this GitHub repository.
 
-By default:
+1. Download or clone the repository.
+2. Install the dependencies with:
 
-- even flight number = outbound
-- odd flight number = inbound
-
-## Main states
-
-openairlog.0.today.hasFlight
-openairlog.0.today.flightCount
-
-openairlog.0.today.startsInFrankfurt
-openairlog.0.today.endsInFrankfurt
-
-openairlog.0.today.isOutbound
-openairlog.0.today.isInbound
-openairlog.0.today.direction
-
-openairlog.0.today.firstFlightNumber
-openairlog.0.today.firstDeparture
-openairlog.0.today.firstArrival
-
-openairlog.0.today.lastFlightNumber
-openairlog.0.today.lastDeparture
-openairlog.0.today.lastArrival
-
-openairlog.0.today.currentLocation
-openairlog.0.today.isCurrentlyAway
-
-## Example
-
-For a rotation such as:
-
-LH498  EDDF -> MMMX
-LH499  MMMX -> EDDF
-
-the adapter reports:
-
-hasFlight         = true
-startsInFrankfurt = true
-endsInFrankfurt   = true
-
-isOutbound        = true
-isInbound         = true
-direction         = rotation
-
-The Frankfurt end condition is determined from the actual arrival airport of the last flight of the day.
-
-## Development
-
+```bash
 npm install
-npm test
-
-GitHub Actions runs the test suite automatically on pushes and pull requests.
-
-## API
-
-The adapter uses the OpenAirLog REST API.
-
-The API key is only used for read access and is never written to the repository.
-
-## Disclaimer
-
-This project is independent and is not affiliated with OpenAirLog or Lufthansa.

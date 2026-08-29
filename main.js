@@ -3,10 +3,13 @@
 const utils = require('@iobroker/adapter-core');
 
 const {
-    summarizeDay,
-    directionForFlight,
-    isFrankfurt,
-    sortFlights
+    normalizeHomebase,
+    sortFlights,
+    routeDirection,
+    parseTimeToSeconds,
+    findNextFlight,
+    getHomebaseAction,
+    summarizeDay
 } = require('./lib/flightLogic');
 
 class OpenAirLog extends utils.Adapter {
@@ -25,18 +28,14 @@ class OpenAirLog extends utils.Adapter {
     async onReady() {
         await this.createObjects();
 
-        await this.setStateAsync(
-            'info.connection',
-            false,
-            true
-        );
+        await this.setStateAsync('info.connection', false, true);
 
         if (!this.config.apiKey) {
-            this.log.error(
-                'No OpenAirLog API key configured.'
-            );
+            this.log.error('No OpenAirLog API key configured.');
             return;
         }
+
+        this.homebase = normalizeHomebase(this.config.homebase);
 
         this.pollInterval =
             Math.max(
@@ -53,6 +52,15 @@ class OpenAirLog extends utils.Adapter {
                 );
             });
         }, this.pollInterval);
+    }
+
+    async onUnload(callback) {
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+        }
+
+        callback();
     }
 
     async createState(id, common) {
@@ -72,21 +80,27 @@ class OpenAirLog extends utils.Adapter {
             native: {}
         });
 
-        await this.createState('info.connection', {
-            name: 'API connection',
-            type: 'boolean',
-            role: 'indicator.connected',
-            read: true,
-            write: false
-        });
+        await this.createState(
+            'info.connection',
+            {
+                name: 'API connection',
+                type: 'boolean',
+                role: 'indicator.connected',
+                read: true,
+                write: false
+            }
+        );
 
-        await this.createState('info.lastUpdate', {
-            name: 'Last successful update',
-            type: 'string',
-            role: 'date',
-            read: true,
-            write: false
-        });
+        await this.createState(
+            'info.lastUpdate',
+            {
+                name: 'Last successful update',
+                type: 'string',
+                role: 'date',
+                read: true,
+                write: false
+            }
+        );
 
         await this.extendObjectAsync('today', {
             type: 'channel',
@@ -107,6 +121,48 @@ class OpenAirLog extends utils.Adapter {
                 'Flight count',
                 'number',
                 'value'
+            ],
+
+            homebase: [
+                'Configured homebase',
+                'string',
+                'text'
+            ],
+
+            homebaseAction: [
+                'Homebase action',
+                'string',
+                'text'
+            ],
+
+            startsInHomebase: [
+                'Starts in homebase',
+                'boolean',
+                'indicator'
+            ],
+
+            endsInHomebase: [
+                'Ends in homebase',
+                'boolean',
+                'indicator'
+            ],
+
+            isOutbound: [
+                'Has outbound flight',
+                'boolean',
+                'indicator'
+            ],
+
+            isInbound: [
+                'Has inbound flight',
+                'boolean',
+                'indicator'
+            ],
+
+            direction: [
+                'Direction',
+                'string',
+                'text'
             ],
 
             firstFlightNumber: [
@@ -169,36 +225,6 @@ class OpenAirLog extends utils.Adapter {
                 'text'
             ],
 
-            startsInFrankfurt: [
-                'Starts in Frankfurt',
-                'boolean',
-                'indicator'
-            ],
-
-            endsInFrankfurt: [
-                'Ends in Frankfurt',
-                'boolean',
-                'indicator'
-            ],
-
-            isOutbound: [
-                'Has outbound flight',
-                'boolean',
-                'indicator'
-            ],
-
-            isInbound: [
-                'Has inbound flight',
-                'boolean',
-                'indicator'
-            ],
-
-            direction: [
-                'Direction',
-                'string',
-                'text'
-            ],
-
             currentLocation: [
                 'Current location',
                 'string',
@@ -206,75 +232,102 @@ class OpenAirLog extends utils.Adapter {
             ],
 
             isCurrentlyAway: [
-                'Currently away from Frankfurt',
+                'Currently away from homebase',
                 'boolean',
                 'indicator'
             ]
         };
 
-        for (const [id, [name, type, role]] of Object.entries(states)) {
-            await this.createState(`today.${id}`, {
-                name,
-                type,
-                role,
-                read: true,
-                write: false
-            });
+        for (
+            const [
+                id,
+                [name, type, role]
+            ] of Object.entries(states)
+        ) {
+            await this.createState(
+                `today.${id}`,
+                {
+                    name,
+                    type,
+                    role,
+                    read: true,
+                    write: false
+                }
+            );
         }
 
-        await this.extendObjectAsync('today.flights', {
-            type: 'channel',
-            common: {
-                name: 'Flights today'
-            },
-            native: {}
-        });
+        await this.extendObjectAsync(
+            'today.flights',
+            {
+                type: 'channel',
+                common: {
+                    name: 'Flights today'
+                },
+                native: {}
+            }
+        );
 
-        await this.extendObjectAsync('next', {
-            type: 'channel',
-            common: {
-                name: 'Next flight'
-            },
-            native: {}
-        });
+        await this.extendObjectAsync(
+            'next',
+            {
+                type: 'channel',
+                common: {
+                    name: 'Next flight'
+                },
+                native: {}
+            }
+        );
 
-        for (const id of [
-            'flightNumber',
-            'date',
-            'departure',
-            'arrival',
-            'scheduledOffBlock',
-            'scheduledOnBlock'
-        ]) {
-            await this.createState(`next.${id}`, {
-                name: id,
-                type: 'string',
-                role: 'text',
-                read: true,
-                write: false
-            });
+        for (
+            const id of [
+                'flightNumber',
+                'date',
+                'departure',
+                'arrival',
+                'scheduledOffBlock',
+                'scheduledOnBlock'
+            ]
+        ) {
+            await this.createState(
+                `next.${id}`,
+                {
+                    name: id,
+                    type: 'string',
+                    role: 'text',
+                    read: true,
+                    write: false
+                }
+            );
         }
     }
 
     async request(path) {
-        const controller = new AbortController();
+        const controller =
+            new AbortController();
 
-        const timeout = setTimeout(() => {
-            controller.abort();
-        }, 20000);
+        const timeout =
+            setTimeout(
+                () => controller.abort(),
+                20000
+            );
 
         try {
-            const response = await fetch(
-                `https://openairlog.de/api/v1${path}`,
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${this.config.apiKey}`,
-                        Accept: 'application/json'
-                    },
-                    signal: controller.signal
-                }
-            );
+            const response =
+                await fetch(
+                    `https://openairlog.de/api/v1${path}`,
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${this.config.apiKey}`,
+
+                            Accept:
+                                'application/json'
+                        },
+
+                        signal:
+                            controller.signal
+                    }
+                );
 
             if (response.status === 401) {
                 throw new Error(
@@ -290,14 +343,17 @@ class OpenAirLog extends utils.Adapter {
 
             if (response.status === 429) {
                 const retryAfter =
-                    response.headers.get('retry-after');
+                    response.headers.get(
+                        'retry-after'
+                    );
 
                 throw new Error(
-                    `OpenAirLog rate limit exceeded${
+                    `OpenAirLog rate limit exceeded` +
+                    (
                         retryAfter
                             ? `; retry after ${retryAfter}s`
                             : ''
-                    }`
+                    )
                 );
             }
 
@@ -308,171 +364,123 @@ class OpenAirLog extends utils.Adapter {
             }
 
             return await response.json();
+
         } finally {
             clearTimeout(timeout);
         }
     }
 
-    /*
-     * OpenAirLog flight dates are interpreted using
-     * Frankfurt / Europe-Berlin as the reference date.
-     *
-     * This prevents UTC conversion from moving a flight
-     * to the wrong calendar day.
-     */
-    getFrankfurtDate() {
-        return new Intl.DateTimeFormat(
-            'en-CA',
-            {
-                timeZone: 'Europe/Berlin',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            }
-        ).format(new Date());
+    getUtcDate() {
+        return new Date()
+            .toISOString()
+            .slice(0, 10);
+    }
+
+    getUtcSeconds() {
+        const now = new Date();
+
+        return (
+            now.getUTCHours() * 3600 +
+            now.getUTCMinutes() * 60 +
+            now.getUTCSeconds()
+        );
     }
 
     getDateRange() {
-        const today = this.getFrankfurtDate();
+        const now = new Date();
 
-        const date = new Date(
-            `${today}T12:00:00+01:00`
+        const fromDate =
+            new Date(now);
+
+        fromDate.setUTCDate(
+            fromDate.getUTCDate() - 1
         );
 
-        date.setDate(date.getDate() - 1);
+        const toDate =
+            new Date(now);
 
-        const from =
-            date.toISOString().slice(0, 10);
-
-        date.setDate(date.getDate() + 3);
-
-        const to =
-            date.toISOString().slice(0, 10);
+        toDate.setUTCDate(
+            toDate.getUTCDate() + 2
+        );
 
         return {
-            from,
-            to,
-            today
+            from:
+                fromDate
+                    .toISOString()
+                    .slice(0, 10),
+
+            to:
+                toDate
+                    .toISOString()
+                    .slice(0, 10),
+
+            today:
+                this.getUtcDate()
         };
-    }
-
-    isFlightInTheFuture(flight, today) {
-        if (!flight?.date) {
-            return false;
-        }
-
-        /*
-         * Any flight on a later calendar day is future.
-         */
-        if (flight.date > today) {
-            return true;
-        }
-
-        /*
-         * Flights from previous days are not future.
-         */
-        if (flight.date < today) {
-            return false;
-        }
-
-        /*
-         * For today's flights compare the scheduled
-         * off-block time with the current Frankfurt time.
-         */
-        if (!flight.scheduled_off_block) {
-            return false;
-        }
-
-        const nowParts =
-            new Intl.DateTimeFormat(
-                'en-GB',
-                {
-                    timeZone: 'Europe/Berlin',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                }
-            ).formatToParts(new Date());
-
-        const parts = {};
-
-        for (const part of nowParts) {
-            parts[part.type] = part.value;
-        }
-
-        const currentSeconds =
-            Number(parts.hour) * 3600 +
-            Number(parts.minute) * 60 +
-            Number(parts.second);
-
-        const match =
-            String(
-                flight.scheduled_off_block
-            ).match(
-                /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
-            );
-
-        if (!match) {
-            return false;
-        }
-
-        const flightSeconds =
-            Number(match[1]) * 3600 +
-            Number(match[2]) * 60 +
-            Number(match[3] || 0);
-
-        return flightSeconds > currentSeconds;
     }
 
     async updateData() {
         try {
+            this.homebase =
+                normalizeHomebase(
+                    this.config.homebase
+                );
+
             const {
                 from,
                 to,
                 today
             } = this.getDateRange();
 
-            this.log.debug(
-                `Loading flights from ${from} to ${to}; today=${today}`
-            );
-
-            const response = await this.request(
-                `/flights?from=${from}&to=${to}&per_page=200`
-            );
+            const response =
+                await this.request(
+                    `/flights?from=${from}&to=${to}&per_page=200`
+                );
 
             const flights =
                 Array.isArray(response?.data)
                     ? response.data
                     : [];
 
-            /*
-             * IMPORTANT:
-             *
-             * The date comparison is performed against the
-             * Frankfurt calendar date, not against UTC.
-             */
             const todayFlights =
                 flights.filter(
                     flight =>
-                        flight.date === today
+                        flight?.date === today
                 );
 
-            this.log.debug(
-                `Found ${todayFlights.length} flight(s) for ${today}`
-            );
+            const currentSeconds =
+                this.getUtcSeconds();
 
             const summary =
                 summarizeDay(
                     todayFlights,
-                    this.config.evenIsOutbound !== false
+                    today,
+                    this.homebase
                 );
 
-            await this.publishToday(summary);
+            const homebaseAction =
+                getHomebaseAction(
+                    todayFlights,
+                    today,
+                    this.homebase,
+                    currentSeconds
+                );
+
+            await this.publishToday(
+                summary,
+                homebaseAction,
+                currentSeconds
+            );
+
+            const next =
+                findNextFlight(
+                    flights,
+                    today,
+                    currentSeconds
+                );
 
             await this.publishNext(
-                flights,
-                today
+                next
             );
 
             await this.setStateAsync(
@@ -486,7 +494,9 @@ class OpenAirLog extends utils.Adapter {
                 new Date().toISOString(),
                 true
             );
+
         } catch (error) {
+
             await this.setStateAsync(
                 'info.connection',
                 false,
@@ -497,13 +507,18 @@ class OpenAirLog extends utils.Adapter {
         }
     }
 
-    async publishToday(summary) {
-        const set = (id, value) =>
-            this.setStateAsync(
-                id,
-                value ?? '',
-                true
-            );
+    async publishToday(
+        summary,
+        homebaseAction,
+        currentSeconds
+    ) {
+        const set =
+            (id, value) =>
+                this.setStateAsync(
+                    id,
+                    value ?? '',
+                    true
+                );
 
         await set(
             'today.hasFlight',
@@ -516,13 +531,23 @@ class OpenAirLog extends utils.Adapter {
         );
 
         await set(
-            'today.startsInFrankfurt',
-            summary.startsInFrankfurt
+            'today.homebase',
+            this.homebase
         );
 
         await set(
-            'today.endsInFrankfurt',
-            summary.endsInFrankfurt
+            'today.homebaseAction',
+            homebaseAction
+        );
+
+        await set(
+            'today.startsInHomebase',
+            summary.startsInHomebase
+        );
+
+        await set(
+            'today.endsInHomebase',
+            summary.endsInHomebase
         );
 
         await set(
@@ -540,10 +565,14 @@ class OpenAirLog extends utils.Adapter {
             summary.direction
         );
 
-        const first = summary.first;
-        const last = summary.last;
+        const first =
+            summary.first;
+
+        const last =
+            summary.last;
 
         const values = {
+
             firstFlightNumber:
                 first?.flight_number,
 
@@ -575,7 +604,12 @@ class OpenAirLog extends utils.Adapter {
                 last?.scheduled_on_block
         };
 
-        for (const [id, value] of Object.entries(values)) {
+        for (
+            const [
+                id,
+                value
+            ] of Object.entries(values)
+        ) {
             await set(
                 `today.${id}`,
                 value
@@ -583,33 +617,36 @@ class OpenAirLog extends utils.Adapter {
         }
 
         /*
-         * Determine the best current location.
+         * Determine current location from the
+         * latest sector which has already departed.
          *
-         * We use actual timestamps where available and
-         * otherwise scheduled times.
+         * OpenAirLog date and scheduled times are
+         * interpreted as UTC.
          */
+
         let currentLocation =
             first?.departure || '';
 
-        const now = Date.now();
-
-        for (const flight of sortFlights(summary.flights)) {
-            const departure =
-                flight.off_block ||
-                flight.scheduled_off_block;
-
-            if (!flight.date || !departure) {
-                continue;
-            }
-
-            const timestamp =
-                Date.parse(
-                    `${flight.date}T${departure}`
+        for (
+            const flight of
+                sortFlights(
+                    summary.flights
+                )
+        ) {
+            const departureSeconds =
+                parseTimeToSeconds(
+                    flight.scheduled_off_block
                 );
 
             if (
-                !Number.isNaN(timestamp) &&
-                timestamp <= now
+                departureSeconds === null
+            ) {
+                continue;
+            }
+
+            if (
+                departureSeconds <=
+                currentSeconds
             ) {
                 currentLocation =
                     flight.arrival ||
@@ -625,12 +662,13 @@ class OpenAirLog extends utils.Adapter {
         await set(
             'today.isCurrentlyAway',
             Boolean(currentLocation) &&
-            !isFrankfurt(currentLocation)
+            currentLocation !== this.homebase
         );
 
         /*
-         * Individual flights of today
+         * Publish today's individual flights.
          */
+
         for (
             let i = 0;
             i < summary.flights.length;
@@ -646,17 +684,20 @@ class OpenAirLog extends utils.Adapter {
                 channelId,
                 {
                     type: 'channel',
+
                     common: {
                         name:
                             `${flight.flight_number || ''} ` +
                             `${flight.departure || ''} → ` +
-                            `${flight.arrival || ''}`.trim()
+                            `${flight.arrival || ''}`
                     },
+
                     native: {}
                 }
             );
 
             const fields = {
+
                 flightNumber:
                     flight.flight_number,
 
@@ -688,32 +729,33 @@ class OpenAirLog extends utils.Adapter {
                     flight.block_minutes,
 
                 direction:
-                    directionForFlight(
+                    routeDirection(
                         flight,
-                        this.config.evenIsOutbound !== false
+                        this.homebase
                     )
             };
 
             for (
-                const [id, value]
-                of Object.entries(fields)
+                const [
+                    id,
+                    value
+                ] of Object.entries(fields)
             ) {
-                const type =
-                    typeof value === 'number'
-                        ? 'number'
-                        : 'string';
-
-                const role =
-                    type === 'number'
-                        ? 'value'
-                        : 'text';
-
                 await this.createState(
                     `${channelId}.${id}`,
                     {
                         name: id,
-                        type,
-                        role,
+
+                        type:
+                            typeof value === 'number'
+                                ? 'number'
+                                : 'string',
+
+                        role:
+                            typeof value === 'number'
+                                ? 'value'
+                                : 'text',
+
                         read: true,
                         write: false
                     }
@@ -727,74 +769,48 @@ class OpenAirLog extends utils.Adapter {
         }
     }
 
-    async publishNext(flights, today) {
-        const sorted =
-            sortFlights(flights);
-
-        /*
-         * Only flights that have not yet departed
-         * are candidates for "next".
-         */
-        const futureFlights =
-            sorted.filter(
-                flight =>
-                    this.isFlightInTheFuture(
-                        flight,
-                        today
-                    )
-            );
-
-        const next =
-            futureFlights[0] || null;
-
-        this.log.debug(
-            next
-                ? `Next flight: ${next.flight_number} ${next.date} ${next.scheduled_off_block}`
-                : 'No future flight found'
-        );
+    async publishNext(flight) {
 
         const values = {
+
             flightNumber:
-                next?.flight_number,
+                flight?.flight_number || '',
 
             date:
-                next?.date,
+                flight?.date || '',
 
             departure:
-                next?.departure,
+                flight?.departure || '',
 
             arrival:
-                next?.arrival,
+                flight?.arrival || '',
 
             scheduledOffBlock:
-                next?.scheduled_off_block,
+                flight?.scheduled_off_block || '',
 
             scheduledOnBlock:
-                next?.scheduled_on_block
+                flight?.scheduled_on_block || ''
         };
 
-        for (const [id, value] of Object.entries(values)) {
+        for (
+            const [
+                id,
+                value
+            ] of Object.entries(values)
+        ) {
             await this.setStateAsync(
                 `next.${id}`,
-                value ?? '',
+                value,
                 true
             );
         }
     }
-
-    onUnload(callback) {
-        if (this.pollTimer) {
-            clearInterval(this.pollTimer);
-            this.pollTimer = null;
-        }
-
-        callback();
-    }
 }
 
 if (require.main !== module) {
-    module.exports = options =>
-        new OpenAirLog(options);
+    module.exports =
+        options =>
+            new OpenAirLog(options);
 } else {
-    new OpenAirLog();
+    (() => new OpenAirLog())();
 }

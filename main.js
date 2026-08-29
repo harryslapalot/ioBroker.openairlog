@@ -22,9 +22,15 @@ class OpenAirLog extends utils.Adapter {
     }
 
     async onReady() {
-        await this.setStateAsync('info.connection', false, true);
+    await this.createObjects();
 
-        if (!this.config.apiKey) {
+    await this.setStateAsync(
+        'info.connection',
+        false,
+        true
+    );
+
+    if (!this.config.apiKey) {
             this.log.error('No OpenAirLog API key configured.');
             return;
         }

@@ -532,8 +532,18 @@ class OpenAirLog extends utils.Adapter {
                                 Accept:
                                     'application/json',
 
-                                Authorization:
-                                    `Bearer ${token}`
+                                /*
+                                 * Use a custom header instead
+                                 * of Authorization.
+                                 *
+                                 * This is more reliable on
+                                 * shared hosting such as
+                                 * ALL-INKL because Apache/PHP
+                                 * may not pass the Authorization
+                                 * header through as expected.
+                                 */
+                                'X-FlightScnrPi-Token':
+                                    token
                             },
 
                             body:
@@ -548,8 +558,25 @@ class OpenAirLog extends utils.Adapter {
                     );
 
                 if (!response.ok) {
+                    let errorDetails = '';
+
+                    try {
+                        errorDetails =
+                            await response.text();
+                    } catch {
+                        /*
+                         * Ignore errors while reading
+                         * the error response.
+                         */
+                    }
+
                     throw new Error(
-                        `HTTP ${response.status}`
+                        `HTTP ${response.status}` +
+                        (
+                            errorDetails
+                                ? `: ${errorDetails.substring(0, 500)}`
+                                : ''
+                        )
                     );
                 }
 

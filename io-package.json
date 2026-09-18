@@ -75,14 +75,18 @@
     ]
   },
   "protectedNative": [
-    "apiKey"
+    "apiKey",
+    "flightScnrPiToken"
   ],
   "encryptedNative": [
-    "apiKey"
+    "apiKey",
+    "flightScnrPiToken"
   ],
   "native": {
     "apiKey": "",
     "interval": 15,
-    "evenIsOutbound": true
+    "evenIsOutbound": true,
+    "flightScnrPiUrl": "https://www.familie-gmelin.de/flightscnrpi/currentFlight.json",
+    "flightScnrPiToken": ""
   }
 }

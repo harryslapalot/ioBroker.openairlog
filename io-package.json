@@ -86,7 +86,8 @@
     "apiKey": "",
     "interval": 15,
     "evenIsOutbound": true,
-    "flightScnrPiUrl": "https://www.familie-gmelin.de/flightscnrpi/currentFlight.json",
+    "flightScnrPiUpdateUrl": "",
+    "flightScnrPiUrl": "",
     "flightScnrPiToken": ""
   }
 }

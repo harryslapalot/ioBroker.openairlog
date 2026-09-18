@@ -458,6 +458,86 @@ class OpenAirLog extends utils.Adapter {
         };
     }
 
+    async publishFlightScnrPi(
+        currentFlightNumber
+    ) {
+        const url =
+            String(
+                this.config.flightScnrPiUrl || ''
+            ).trim();
+
+        const token =
+            String(
+                this.config.flightScnrPiToken || ''
+            ).trim();
+
+        if (!url) {
+            return;
+        }
+
+        if (!token) {
+            this.log.warn(
+                'FlightScnrPi export is configured, but no token is set.'
+            );
+            return;
+        }
+
+        try {
+            const controller =
+                new AbortController();
+
+            const timeout =
+                setTimeout(
+                    () => controller.abort(),
+                    10000
+                );
+
+            try {
+                const response =
+                    await fetch(
+                        url,
+                        {
+                            method: 'POST',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json',
+
+                                Accept:
+                                    'application/json',
+
+                                Authorization:
+                                    `Bearer ${token}`
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    flightNumber:
+                                        currentFlightNumber || ''
+                                }),
+
+                            signal:
+                                controller.signal
+                        }
+                    );
+
+                if (!response.ok) {
+                    throw new Error(
+                        `HTTP ${response.status}`
+                    );
+                }
+
+            } finally {
+                clearTimeout(timeout);
+            }
+
+        } catch (error) {
+            this.log.warn(
+                `FlightScnrPi export failed: ${error.message}`
+            );
+        }
+    }
+
     async updateData() {
         try {
             this.homebase =
@@ -770,9 +850,23 @@ class OpenAirLog extends utils.Adapter {
                 new Date()
             );
 
+        const currentFlightNumber =
+            currentFlight?.flight_number || '';
+
         await set(
             'today.currentFlightNumber',
-            currentFlight?.flight_number || ''
+            currentFlightNumber
+        );
+
+        /*
+         * Send the current flight number to
+         * the configured FlightScnrPi endpoint.
+         *
+         * The endpoint creates the JSON file and
+         * adds the server-side update timestamp.
+         */
+        await this.publishFlightScnrPi(
+            currentFlightNumber
         );
 
         /*

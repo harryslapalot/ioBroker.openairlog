@@ -4,7 +4,7 @@ const utils = require('@iobroker/adapter-core');
 
 const {
     normalizeHomebase,
-    sortFlights,
+    filterFlights,
     routeDirection,
     parseTimeToSeconds,
     getDepartureTime,
@@ -12,6 +12,7 @@ const {
     findNextFlight,
     getHomebaseAction,
     summarizeDay,
+    getCurrentFlight,
     getCurrentLocation
 } = require('./lib/flightLogic');
 
@@ -253,6 +254,12 @@ class OpenAirLog extends utils.Adapter {
                 'Currently away from homebase',
                 'boolean',
                 'indicator'
+            ],
+
+            currentFlightNumber: [
+                'Current flight number',
+                'string',
+                'text'
             ]
         };
 
@@ -424,10 +431,6 @@ class OpenAirLog extends utils.Adapter {
         const fromDate =
             new Date(now);
 
-        /*
-         * Keep seven days of history available
-         * for currentLocation.
-         */
         fromDate.setUTCDate(
             fromDate.getUTCDate() - 7
         );
@@ -435,9 +438,6 @@ class OpenAirLog extends utils.Adapter {
         const toDate =
             new Date(now);
 
-        /*
-         * Keep two future days for next.
-         */
         toDate.setUTCDate(
             toDate.getUTCDate() + 2
         );
@@ -476,10 +476,23 @@ class OpenAirLog extends utils.Adapter {
                     `/flights?from=${from}&to=${to}&per_page=200`
                 );
 
+            /*
+             * IMPORTANT:
+             *
+             * Only records with a flight number
+             * are considered actual flights.
+             *
+             * This filters out duty-plan entries such
+             * as "Krank", which may contain EDDF as
+             * departure and arrival but have no
+             * flight number.
+             */
             const flights =
-                Array.isArray(response?.data)
-                    ? response.data
-                    : [];
+                filterFlights(
+                    Array.isArray(response?.data)
+                        ? response.data
+                        : []
+                );
 
             const todayFlights =
                 flights.filter(
@@ -505,11 +518,6 @@ class OpenAirLog extends utils.Adapter {
                     currentSeconds
                 );
 
-            /*
-             * Pass the complete loaded flight history
-             * so currentLocation can use flights from
-             * previous UTC dates as well.
-             */
             await this.publishToday(
                 summary,
                 homebaseAction,
@@ -517,12 +525,6 @@ class OpenAirLog extends utils.Adapter {
                 flights
             );
 
-            /*
-             * Find the next not-yet-started flight.
-             *
-             * Remaining flights today have priority
-             * over flights on later dates.
-             */
             const next =
                 findNextFlight(
                     flights,
@@ -561,10 +563,6 @@ class OpenAirLog extends utils.Adapter {
     async cleanupOldFlightObjects(
         flightCount
     ) {
-        /*
-         * getForeignObjectsAsync() returns an object map,
-         * not an array.
-         */
         const objects =
             await this.getForeignObjectsAsync(
                 `${this.namespace}.today.flights.*`
@@ -603,14 +601,6 @@ class OpenAirLog extends utils.Adapter {
                     prefix.length
                 );
 
-            /*
-             * Only match actual flight channels:
-             *
-             * today.flights.0
-             * today.flights.1
-             *
-             * Child states are ignored here.
-             */
             const match =
                 relative.match(
                     /^(\d+)$/
@@ -703,11 +693,6 @@ class OpenAirLog extends utils.Adapter {
         const last =
             summary.last;
 
-        /*
-         * Use scheduled times when available.
-         * For already recorded flights OpenAirLog may
-         * only provide off_block / on_block.
-         */
         const firstOffBlock =
             first
                 ? getDepartureTime(first)
@@ -774,12 +759,25 @@ class OpenAirLog extends utils.Adapter {
         }
 
         /*
-         * Determine current location from the complete
-         * flight history, not only today's flights.
+         * Current flight:
          *
-         * This allows the adapter to know that the user
-         * is still in Mexico even when today's flight list
-         * is empty and the next flight starts in Mexico.
+         * This uses ONLY scheduled off-block and
+         * scheduled on-block times.
+         */
+        const currentFlight =
+            getCurrentFlight(
+                allFlights,
+                new Date()
+            );
+
+        await set(
+            'today.currentFlightNumber',
+            currentFlight?.flight_number || ''
+        );
+
+        /*
+         * Current location uses the complete
+         * historical flight data.
          */
         const currentPosition =
             getCurrentLocation(
@@ -801,16 +799,10 @@ class OpenAirLog extends utils.Adapter {
             currentLocation !== this.homebase
         );
 
-        /*
-         * Remove obsolete flight channels.
-         */
         await this.cleanupOldFlightObjects(
             summary.flights.length
         );
 
-        /*
-         * Publish today's individual flights.
-         */
         for (
             let i = 0;
             i < summary.flights.length;
@@ -838,13 +830,6 @@ class OpenAirLog extends utils.Adapter {
                 }
             );
 
-            /*
-             * Keep the existing state names.
-             *
-             * scheduledOffBlock and scheduledOnBlock
-             * contain the scheduled value when available
-             * and otherwise the actual block time.
-             */
             const fields = {
 
                 flightNumber:
@@ -937,10 +922,6 @@ class OpenAirLog extends utils.Adapter {
             arrival:
                 flight?.arrival || '',
 
-            /*
-             * scheduled values are preferred.
-             * off_block / on_block are used as fallback.
-             */
             scheduledOffBlock:
                 flight
                     ? getDepartureTime(flight)

@@ -28,16 +28,20 @@
           "default": 15,
           "unit": "min"
         },
+        "flightScnrPiUpdateUrl": {
+          "type": "text",
+          "label": "FlightScnrPi Update URL",
+          "help": "HTTPS URL of the server endpoint that receives the current flight number."
+        },
         "flightScnrPiUrl": {
           "type": "text",
           "label": "FlightScnrPi JSON URL",
-          "help": "HTTPS URL where the current flight information is sent.",
-          "default": "https://www.familie-gmelin.de/flightscnrpi/currentFlight.json"
+          "help": "URL of the currentFlight.json file that FlightScnrPi can read."
         },
         "flightScnrPiToken": {
           "type": "password",
           "label": "FlightScnrPi token",
-          "help": "Secret token used to authenticate the FlightScnrPi JSON endpoint.",
+          "help": "Secret token used to authenticate the FlightScnrPi update endpoint.",
           "encrypted": true
         }
       }

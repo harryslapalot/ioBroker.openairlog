@@ -25,6 +25,15 @@ class OpenAirLog extends utils.Adapter {
 
         this.pollTimer = null;
 
+        /*
+         * Contains the last flight number that was
+         * successfully sent to FlightScnrPi.
+         *
+         * null means that nothing has been sent yet
+         * during this adapter runtime.
+         */
+        this.lastFlightScnrPiNumber = null;
+
         this.on('ready', () => this.onReady());
         this.on('unload', callback => this.onUnload(callback));
     }
@@ -472,14 +481,31 @@ class OpenAirLog extends utils.Adapter {
             ).trim();
 
         if (!url) {
-            return;
+            return true;
         }
 
         if (!token) {
             this.log.warn(
                 'FlightScnrPi export is configured, but no token is set.'
             );
-            return;
+
+            return false;
+        }
+
+        /*
+         * Do not send anything if the current flight
+         * number has not changed since the last
+         * successful transmission.
+         *
+         * null means that this is the first attempt
+         * after adapter startup.
+         */
+        if (
+            this.lastFlightScnrPiNumber !== null &&
+            this.lastFlightScnrPiNumber ===
+                currentFlightNumber
+        ) {
+            return true;
         }
 
         try {
@@ -531,10 +557,28 @@ class OpenAirLog extends utils.Adapter {
                 clearTimeout(timeout);
             }
 
+            /*
+             * Only remember the value after a
+             * successful HTTP response.
+             *
+             * If the request failed, the next poll
+             * will try again.
+             */
+            this.lastFlightScnrPiNumber =
+                currentFlightNumber;
+
+            this.log.debug(
+                `FlightScnrPi export updated: ${currentFlightNumber || '(no current flight)'}`
+            );
+
+            return true;
+
         } catch (error) {
             this.log.warn(
                 `FlightScnrPi export failed: ${error.message}`
             );
+
+            return false;
         }
     }
 
@@ -864,6 +908,10 @@ class OpenAirLog extends utils.Adapter {
          *
          * The endpoint creates the JSON file and
          * adds the server-side update timestamp.
+         *
+         * The request is only made when the value
+         * has changed since the last successful
+         * transmission.
          */
         await this.publishFlightScnrPi(
             currentFlightNumber

@@ -472,7 +472,7 @@ class OpenAirLog extends utils.Adapter {
     ) {
         const url =
             String(
-                this.config.flightScnrPiUrl || ''
+                this.config.flightScnrPiUpdateUrl || ''
             ).trim();
 
         const token =
@@ -532,16 +532,6 @@ class OpenAirLog extends utils.Adapter {
                                 Accept:
                                     'application/json',
 
-                                /*
-                                 * Use a custom header instead
-                                 * of Authorization.
-                                 *
-                                 * This is more reliable on
-                                 * shared hosting such as
-                                 * ALL-INKL because Apache/PHP
-                                 * may not pass the Authorization
-                                 * header through as expected.
-                                 */
                                 'X-FlightScnrPi-Token':
                                     token
                             },

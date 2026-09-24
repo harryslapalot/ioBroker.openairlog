@@ -704,6 +704,54 @@ class OpenAirLog extends utils.Adapter {
     async cleanupOldFlightObjects(
         flightCount
     ) {
+        const flightsChannelId =
+            `${this.namespace}.today.flights`;
+
+        /*
+         * If there are no flights today, remove the
+         * complete flights channel recursively.
+         *
+         * This is more reliable than trying to find
+         * individual numeric child channels and also
+         * removes any stale objects that might have
+         * survived from a previous day.
+         */
+        if (flightCount === 0) {
+            try {
+                await this.delForeignObjectAsync(
+                    flightsChannelId,
+                    {
+                        recursive: true
+                    }
+                );
+            } catch (error) {
+                /*
+                 * The object may already have been
+                 * removed. Log only unexpected errors.
+                 */
+                this.log.debug(
+                    `Could not remove empty today.flights channel: ${error.message}`
+                );
+            }
+
+            /*
+             * Recreate the container so the object
+             * remains available in the ioBroker tree.
+             */
+            await this.extendObjectAsync(
+                'today.flights',
+                {
+                    type: 'channel',
+                    common: {
+                        name: 'Flights today'
+                    },
+                    native: {}
+                }
+            );
+
+            return;
+        }
+
         const objects =
             await this.getForeignObjectsAsync(
                 `${this.namespace}.today.flights.*`
@@ -923,8 +971,9 @@ class OpenAirLog extends utils.Adapter {
          * Send the current flight number to
          * the configured FlightScnrPi endpoint.
          *
-         * The endpoint creates the JSON file and
-         * adds the server-side update timestamp.
+         * The endpoint creates the JSON content
+         * inside currentFlight.txt and adds the
+         * server-side update timestamp.
          *
          * The request is only made when the value
          * has changed since the last successful

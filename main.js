@@ -269,6 +269,12 @@ class OpenAirLog extends utils.Adapter {
                 'Current flight number',
                 'string',
                 'text'
+            ],
+
+            currentFlightDate: [
+                'Current flight departure date',
+                'string',
+                'date'
             ]
         };
 
@@ -967,6 +973,11 @@ class OpenAirLog extends utils.Adapter {
             currentFlightNumber
         );
 
+        await set(
+            'today.currentFlightDate',
+            currentFlight?.date
+        );
+
         /*
          * Send the current flight number to
          * the configured FlightScnrPi endpoint.
@@ -1183,3 +1194,4 @@ if (require.main !== module) {
 } else {
     (() => new OpenAirLog())();
 }
+

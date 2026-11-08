@@ -21,10 +21,10 @@ const {
 } = require('../lib/flightLogic');
 
 
-test('normalizes homebase', () => {
+test('normalizes homebase using IATA codes', () => {
     assert.equal(
-        normalizeHomebase('eddf'),
-        'EDDF'
+        normalizeHomebase('fra'),
+        'FRA'
     );
 
     assert.equal(
@@ -34,24 +34,24 @@ test('normalizes homebase', () => {
 
     assert.equal(
         normalizeHomebase(''),
-        'EDDF'
+        'FRA'
     );
 });
 
 
-test('recognizes homebase', () => {
+test('recognizes homebase using IATA codes', () => {
     assert.equal(
-        isHomebase('EDDF', 'EDDF'),
+        isHomebase('FRA', 'FRA'),
         true
     );
 
     assert.equal(
-        isHomebase('eddf', 'EDDF'),
+        isHomebase('fra', 'FRA'),
         true
     );
 
     assert.equal(
-        isHomebase('MUC', 'EDDF'),
+        isHomebase('MUC', 'FRA'),
         false
     );
 
@@ -172,20 +172,20 @@ test('sorts flights by date and departure time', () => {
 test('detects outbound and inbound flights for Frankfurt', () => {
     const outbound = {
         flight_number: 'LH498',
-        departure: 'EDDF',
-        arrival: 'MMMX'
+        departure: 'FRA',
+        arrival: 'HAM'
     };
 
     const inbound = {
         flight_number: 'LH499',
-        departure: 'MMMX',
-        arrival: 'EDDF'
+        departure: 'HAM',
+        arrival: 'FRA'
     };
 
     assert.equal(
         routeDirection(
             outbound,
-            'EDDF'
+            'FRA'
         ),
         'outbound'
     );
@@ -193,7 +193,7 @@ test('detects outbound and inbound flights for Frankfurt', () => {
     assert.equal(
         routeDirection(
             inbound,
-            'EDDF'
+            'FRA'
         ),
         'inbound'
     );
@@ -201,7 +201,7 @@ test('detects outbound and inbound flights for Frankfurt', () => {
     assert.equal(
         isOutboundFlight(
             outbound,
-            'EDDF'
+            'FRA'
         ),
         true
     );
@@ -209,7 +209,32 @@ test('detects outbound and inbound flights for Frankfurt', () => {
     assert.equal(
         isInboundFlight(
             inbound,
-            'EDDF'
+            'FRA'
+        ),
+        true
+    );
+});
+
+
+test('detects LH462 as outbound from Frankfurt using IATA codes', () => {
+    const flight = {
+        flight_number: 'LH462',
+        departure: 'FRA',
+        arrival: 'MIA'
+    };
+
+    assert.equal(
+        routeDirection(
+            flight,
+            'FRA'
+        ),
+        'outbound'
+    );
+
+    assert.equal(
+        isOutboundFlight(
+            flight,
+            'FRA'
         ),
         true
     );
@@ -252,7 +277,7 @@ test('summarizes a Frankfurt rotation', () => {
         {
             date: '2026-08-29',
             flight_number: 'LH498',
-            departure: 'EDDF',
+            departure: 'FRA',
             arrival: 'HAM',
             scheduled_off_block: '10:00:00',
             scheduled_on_block: '11:00:00'
@@ -261,7 +286,7 @@ test('summarizes a Frankfurt rotation', () => {
             date: '2026-08-29',
             flight_number: 'LH499',
             departure: 'HAM',
-            arrival: 'EDDF',
+            arrival: 'FRA',
             scheduled_off_block: '12:00:00',
             scheduled_on_block: '13:00:00'
         }
@@ -271,7 +296,7 @@ test('summarizes a Frankfurt rotation', () => {
         summarizeDay(
             flights,
             '2026-08-29',
-            'EDDF'
+            'FRA'
         );
 
     assert.equal(
@@ -321,14 +346,14 @@ test('finds the remaining flight today before tomorrow', () => {
         {
             date: '2026-08-29',
             flight_number: 'LH123',
-            departure: 'EDDF',
-            arrival: 'EDDH',
+            departure: 'FRA',
+            arrival: 'HAM',
             scheduled_off_block: '19:00:00'
         },
         {
             date: '2026-08-30',
             flight_number: 'LH456',
-            departure: 'EDDF',
+            departure: 'FRA',
             arrival: 'MUC',
             scheduled_off_block: '08:00:00'
         }
@@ -353,15 +378,15 @@ test('finds tomorrow when no flight remains today', () => {
         {
             date: '2026-08-29',
             flight_number: 'LH123',
-            departure: 'EDDF',
-            arrival: 'EDDH',
+            departure: 'FRA',
+            arrival: 'HAM',
             scheduled_off_block: '10:00:00'
         },
         {
             date: '2026-08-30',
             flight_number: 'LH456',
-            departure: 'MMMX',
-            arrival: 'EDDF',
+            departure: 'MEX',
+            arrival: 'FRA',
             scheduled_off_block: '01:50:00'
         }
     ];
@@ -390,8 +415,8 @@ test('returns no next flight when nothing is available', () => {
         {
             date: '2026-08-29',
             flight_number: 'LH123',
-            departure: 'EDDF',
-            arrival: 'EDDH',
+            departure: 'FRA',
+            arrival: 'HAM',
             scheduled_off_block: '10:00:00'
         }
     ];
@@ -415,7 +440,7 @@ test('homebaseAction is outbound when another homebase departure remains', () =>
         {
             date: '2026-08-29',
             flight_number: 'LH123',
-            departure: 'EDDF',
+            departure: 'FRA',
             arrival: 'HAM',
             scheduled_off_block: '10:00:00'
         },
@@ -423,13 +448,13 @@ test('homebaseAction is outbound when another homebase departure remains', () =>
             date: '2026-08-29',
             flight_number: 'LH124',
             departure: 'HAM',
-            arrival: 'EDDF',
+            arrival: 'FRA',
             scheduled_off_block: '12:00:00'
         },
         {
             date: '2026-08-29',
             flight_number: 'LH125',
-            departure: 'EDDF',
+            departure: 'FRA',
             arrival: 'BEG',
             scheduled_off_block: '20:30:00'
         }
@@ -439,7 +464,7 @@ test('homebaseAction is outbound when another homebase departure remains', () =>
         getHomebaseAction(
             flights,
             '2026-08-29',
-            'EDDF',
+            'FRA',
             parseTimeToSeconds('18:00:00')
         ),
         'outbound'
@@ -452,7 +477,7 @@ test('homebaseAction is inbound when the last flight returns home', () => {
         {
             date: '2026-08-29',
             flight_number: 'LH123',
-            departure: 'EDDF',
+            departure: 'FRA',
             arrival: 'HAM',
             scheduled_off_block: '10:00:00'
         },
@@ -460,7 +485,7 @@ test('homebaseAction is inbound when the last flight returns home', () => {
             date: '2026-08-29',
             flight_number: 'LH124',
             departure: 'HAM',
-            arrival: 'EDDF',
+            arrival: 'FRA',
             scheduled_off_block: '12:00:00'
         }
     ];
@@ -469,7 +494,7 @@ test('homebaseAction is inbound when the last flight returns home', () => {
         getHomebaseAction(
             flights,
             '2026-08-29',
-            'EDDF',
+            'FRA',
             parseTimeToSeconds('14:00:00')
         ),
         'inbound'
@@ -482,8 +507,8 @@ test('current location remains Mexico after arriving there', () => {
         {
             date: '2026-08-28',
             flight_number: 'LH498',
-            departure: 'EDDF',
-            arrival: 'MMMX',
+            departure: 'FRA',
+            arrival: 'MEX',
             scheduled_off_block: '10:00:00',
             scheduled_on_block: '20:00:00'
         }
@@ -499,7 +524,7 @@ test('current location remains Mexico after arriving there', () => {
 
     assert.equal(
         result.location,
-        'MMMX'
+        'MEX'
     );
 
     assert.equal(
@@ -514,16 +539,16 @@ test('current location is Frankfurt after returning home', () => {
         {
             date: '2026-08-28',
             flight_number: 'LH498',
-            departure: 'EDDF',
-            arrival: 'MMMX',
+            departure: 'FRA',
+            arrival: 'MEX',
             scheduled_off_block: '10:00:00',
             scheduled_on_block: '20:00:00'
         },
         {
             date: '2026-08-29',
             flight_number: 'LH499',
-            departure: 'MMMX',
-            arrival: 'EDDF',
+            departure: 'MEX',
+            arrival: 'FRA',
             scheduled_off_block: '01:50:00',
             scheduled_on_block: '12:50:00'
         }
@@ -539,7 +564,7 @@ test('current location is Frankfurt after returning home', () => {
 
     assert.equal(
         result.location,
-        'EDDF'
+        'FRA'
     );
 
     assert.equal(
@@ -554,8 +579,8 @@ test('handles a flight crossing midnight', () => {
         {
             date: '2026-08-28',
             flight_number: 'LH498',
-            departure: 'EDDF',
-            arrival: 'MMMX',
+            departure: 'FRA',
+            arrival: 'MEX',
             scheduled_off_block: '23:00:00',
             scheduled_on_block: '01:30:00'
         }
@@ -575,7 +600,7 @@ test('handles a flight crossing midnight', () => {
 
     assert.equal(
         airborne.location,
-        'EDDF'
+        'FRA'
     );
 
     /*
@@ -591,7 +616,7 @@ test('handles a flight crossing midnight', () => {
 
     assert.equal(
         arrived.location,
-        'MMMX'
+        'MEX'
     );
 });
 
@@ -601,8 +626,8 @@ test('current location can be determined even when today has no flights', () => 
         {
             date: '2026-08-28',
             flight_number: 'LH498',
-            departure: 'EDDF',
-            arrival: 'MMMX',
+            departure: 'FRA',
+            arrival: 'MEX',
             scheduled_off_block: '10:00:00',
             scheduled_on_block: '20:00:00'
         }
@@ -618,7 +643,7 @@ test('current location can be determined even when today has no flights', () => 
 
     assert.equal(
         result.location,
-        'MMMX'
+        'MEX'
     );
 });
 
@@ -628,7 +653,7 @@ test('current location follows the latest completed flight', () => {
         {
             date: '2026-08-27',
             flight_number: 'LH100',
-            departure: 'EDDF',
+            departure: 'FRA',
             arrival: 'LHR',
             scheduled_off_block: '08:00:00',
             scheduled_on_block: '09:00:00'
@@ -645,7 +670,7 @@ test('current location follows the latest completed flight', () => {
             date: '2026-08-28',
             flight_number: 'LH102',
             departure: 'CDG',
-            arrival: 'MMMX',
+            arrival: 'MEX',
             scheduled_off_block: '12:00:00',
             scheduled_on_block: '20:00:00'
         }
@@ -661,7 +686,7 @@ test('current location follows the latest completed flight', () => {
 
     assert.equal(
         result.location,
-        'MMMX'
+        'MEX'
     );
 
     assert.equal(

@@ -10,7 +10,7 @@ ioBroker adapter for reading flight data from the OpenAirLog REST API.
 - Detects whether there are flights on the current UTC date.
 - Uses the OpenAirLog `date` field as the flight's departure date.
 - Supports flights crossing midnight.
-- Supports a configurable homebase using a four-letter ICAO airport code.
+- Supports a configurable homebase using a three-letter IATA airport code.
 - Determines outbound/inbound from the actual route.
 - Provides `today.homebaseAction` for GPS-based automations.
 - Handles short-haul rotations with multiple visits to the homebase.
@@ -34,7 +34,7 @@ The adapter can currently be tested directly from this GitHub repository.
 3. Install the adapter in ioBroker from the GitHub repository.
 4. Open the adapter configuration.
 5. Enter your OpenAirLog API key.
-6. Configure your homebase.
+6. Configure your homebase using its three-letter IATA code.
 
 ---
 
@@ -46,14 +46,16 @@ Your OpenAirLog API key.
 
 The adapter only requires the read-only `flights:read` API permission.
 
-## Homebase
+## Homebase (IATA)
 
-The homebase is configured using the four-letter ICAO airport code.
+The homebase is configured using the three-letter IATA airport code.
 
 Examples:
 
-- `EDDF` — Frankfurt
-- `EDDM` — Munich
+- `FRA` — Frankfurt
+- `MUC` — Munich
+
+Use the same airport code format that OpenAirLog provides in the `departure` and `arrival` fields.
 
 The homebase is used for:
 
@@ -161,15 +163,15 @@ Example:
 
 **Type:** string
 
-Contains the currently configured homebase.
+Contains the currently configured homebase as an IATA airport code.
 
 Example:
 
-    EDDF
+    FRA
 
 or:
 
-    EDDM
+    MUC
 
 ---
 
@@ -191,11 +193,11 @@ Indicates that a visit to the homebase should be treated as the start of another
 
 Example:
 
-    EDDF → HAM
-    HAM → EDDF
-    EDDF → BEG
+    FRA → HAM
+    HAM → FRA
+    FRA → BEG
 
-When the GPS trigger detects arrival at EDDF after the HAM sector, the adapter identifies the subsequent EDDF → BEG flight and returns:
+When the GPS trigger detects arrival at FRA after the HAM sector, the adapter identifies the subsequent FRA → BEG flight and returns:
 
     outbound
 
@@ -205,10 +207,10 @@ Indicates that the homebase visit represents the final return home for the day.
 
 Example:
 
-    EDDF → HAM
-    HAM → EDDF
+    FRA → HAM
+    HAM → FRA
 
-After returning to EDDF, there is no later departure from the homebase.
+After returning to FRA, there is no later departure from the homebase.
 
 The state becomes:
 
@@ -230,7 +232,7 @@ Indicates whether the first flight of today's rotation departs from the configur
 
 Example:
 
-    EDDF → HAM
+    FRA → HAM
 
 returns:
 
@@ -246,7 +248,7 @@ Indicates whether the last flight of today's rotation arrives at the configured 
 
 Example:
 
-    HAM → EDDF
+    HAM → FRA
 
 returns:
 
@@ -285,8 +287,8 @@ Possible values:
 
 For example:
 
-    EDDF → HAM
-    HAM → EDDF
+    FRA → HAM
+    HAM → FRA
 
 results in:
 
@@ -312,7 +314,7 @@ Departure airport of the first flight.
 
 Example:
 
-    EDDF
+    FRA
 
 ## `today.firstArrival`
 
@@ -320,7 +322,7 @@ Arrival airport of the first flight.
 
 Example:
 
-    MMMX
+    MEX
 
 ## `today.firstScheduledOffBlock`
 
@@ -381,11 +383,11 @@ This is important when there are no flights on the current day.
 For example:
 
     2026-08-28
-    EDDF → MMMX
+    FRA → MEX
 
 After arrival in Mexico, the state can show:
 
-    MMMX
+    MEX
 
 even if there are no flights on:
 
@@ -403,8 +405,8 @@ Indicates whether the current location differs from the configured homebase.
 
 Example:
 
-    homebase = EDDF
-    currentLocation = MMMX
+    homebase = FRA
+    currentLocation = MEX
 
 results in:
 
@@ -412,7 +414,7 @@ results in:
 
 When:
 
-    currentLocation = EDDF
+    currentLocation = FRA
 
 the state becomes:
 
@@ -459,19 +461,19 @@ The value is not changed when a flight crosses midnight.
 
 ## `departure`
 
-Departure airport as ICAO code.
+Departure airport as IATA code.
 
 Example:
 
-    EDDF
+    FRA
 
 ## `arrival`
 
-Arrival airport as ICAO code.
+Arrival airport as IATA code.
 
 Example:
 
-    MMMX
+    MEX
 
 ## `scheduledOffBlock`
 
@@ -528,9 +530,9 @@ Possible values:
 - `homebase`
 - `enroute`
 
-Example with EDDF as homebase:
+Example with FRA as homebase:
 
-    EDDF → HAM
+    FRA → HAM
 
 results in:
 
@@ -538,7 +540,7 @@ results in:
 
 while:
 
-    HAM → EDDF
+    HAM → FRA
 
 results in:
 
@@ -564,17 +566,17 @@ For example:
 
     Today:
 
-    10:00 EDDF → HAM
-    12:00 HAM → EDDF
-    20:00 EDDF → BEG
+    10:00 FRA → HAM
+    12:00 HAM → FRA
+    20:00 FRA → BEG
 
     Tomorrow:
 
-    08:00 EDDF → MUC
+    08:00 FRA → MUC
 
 At 18:00, `next` is:
 
-    EDDF → BEG
+    FRA → BEG
 
 not tomorrow's MUC flight.
 
@@ -662,9 +664,9 @@ Example:
 
 for:
 
-    EDDF → MMMX
+    FRA → MEX
 
-with EDDF configured as homebase.
+with FRA configured as homebase.
 
 ---
 
@@ -711,7 +713,7 @@ For example:
 
 ### Departure from homebase
 
-GPS detects arrival at EDDF.
+GPS detects arrival at FRA.
 
 The adapter determines:
 
@@ -721,9 +723,9 @@ The automation can therefore identify that this homebase visit is the beginning 
 
 ### Return to homebase
 
-GPS detects arrival at EDDF.
+GPS detects arrival at FRA.
 
-If there are no further homebase departures that day and the final sector ends at EDDF:
+If there are no further homebase departures that day and the final sector ends at FRA:
 
     homebaseAction = inbound
 
@@ -737,12 +739,12 @@ and:
 
 This is particularly useful for short-haul rotations such as:
 
-    EDDF → HAM
-    HAM → EDDF
-    EDDF → BEG
-    BEG → EDDF
+    FRA → HAM
+    HAM → FRA
+    FRA → BEG
+    BEG → FRA
 
-The intermediate EDDF visit is not treated as the final return.
+The intermediate FRA visit is not treated as the final return.
 
 ---
 
@@ -760,14 +762,14 @@ even when the current day contains no flights.
 For example:
 
     Yesterday:
-    EDDF → MMMX
+    FRA → MEX
 
     Today:
     no flights
 
 The adapter can still determine:
 
-    currentLocation = MMMX
+    currentLocation = MEX
     isCurrentlyAway = true
 
 Historical data is also important when a flight crosses midnight.

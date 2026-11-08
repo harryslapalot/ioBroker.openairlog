@@ -13,12 +13,12 @@
           "encrypted": true
         },
         "homebase": {
-          "type": "text",
-          "label": "Homebase (ICAO)",
-          "help": "Four-letter ICAO airport code, e.g. EDDF for Frankfurt or EDDM for Munich.",
-          "default": "EDDF",
-          "maxLength": 4,
-          "validator": "!!data.homebase && /^[A-Za-z]{4}$/.test(data.homebase)"
+  "type": "text",
+  "label": "Homebase (IATA)",
+  "help": "Three-letter IATA airport code, e.g. FRA for Frankfurt or MUC for Munich.",
+  "default": "FRA",
+  "maxLength": 3,
+  "validator": "!!data.homebase && /^[A-Za-z]{3}$/.test(data.homebase)"
         },
         "interval": {
           "type": "number",
